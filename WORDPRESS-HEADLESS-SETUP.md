@@ -104,6 +104,50 @@ Para cada curso:
 5. Completar los campos ACF, especialmente categoría, duración, precio, fecha de inicio, estado, modalidad, temario y salida laboral.
 6. Publicar.
 
+## 5b. Crear el Custom Post Type `taller`
+
+El frontend también consume un segundo endpoint, `/wp-json/wp/v2/taller`, para
+la sección de talleres (independiente de la de cursos). Repetir el mismo
+proceso que en la sección 3, pero con:
+
+- **Post Type Slug**: `taller`
+- **Plural Label**: `Talleres`
+- **Singular Label**: `Taller`
+- `show_in_rest` activado
+
+Campos ACF del grupo asociado a `Taller`:
+
+- Fecha de inicio: campo Fecha. Nombre ACF: `fecha_inicio`.
+- Fecha de inscripción: campo Fecha. Nombre ACF: `fecha_inscripcion`.
+
+El título del post se usa como título del taller, y el extracto (`excerpt`)
+como descripción. La imagen destacada se usa como imagen del taller.
+
+## 5c. Crear el Custom Post Type `testimonio`
+
+Permite que los testimonios de egresados (hoy fijos en el código) se puedan
+editar desde WordPress. Repetir el mismo proceso que en la sección 3, con:
+
+- **Post Type Slug**: `testimonio`
+- **Plural Label**: `Testimonios`
+- **Singular Label**: `Testimonio`
+- `show_in_rest` activado
+
+Campos ACF del grupo asociado a `Testimonio`:
+
+- Curso realizado: campo Texto. Nombre ACF: `curso`.
+- Texto del testimonio: campo Área de texto. Nombre ACF: `texto`.
+- Iniciales: campo Texto, 2 caracteres (ej. "ML"). Nombre ACF: `iniciales`.
+  Opcional — si se deja vacío, el frontend genera las iniciales
+  automáticamente a partir del nombre.
+
+El título del post se usa como nombre de la persona (ej. "María López").
+
+⚠️ Si este CPT no se crea, o queda vacío, **no pasa nada**: el sitio sigue
+mostrando los testimonios actuales (reales, ya confirmados) que están fijos
+en el código como respaldo. Crear el CPT es opcional, solo hace falta si se
+quiere poder agregar o editar testimonios sin tocar código en el futuro.
+
 ## 6. Configurar Contact Form 7 para inscripciones
 
 ### Formulario
@@ -207,8 +251,15 @@ Reemplazar `123` por el ID real del formulario de Contact Form 7.
 
 - Entrar a **Cursos > Todos los cursos** para agregar/editar/eliminar cursos.
 - Completar la **imagen destacada**, **descripción**, **duración**, **precio**, **fecha de inicio**, **estado** y **matrícula**.
+- Entrar a **Talleres** para agregar/editar/eliminar talleres (fecha de inicio y de inscripción).
+- Entrar a **Testimonios** (opcional) para agregar/editar testimonios de egresados.
 - Revisar inscripciones en **Flamingo > Inbound Messages**.
 - Exportar inscripciones a Excel desde el plugin instalado.
+
+Lo que **no** tiene que hacer: instalar Elementor ni maquetar nada visualmente
+en WordPress. El diseño y la maquetación del sitio público viven en el
+frontend (Vercel), no en WordPress — WordPress es únicamente el panel donde
+se cargan los datos.
 
 ## 12. Probar localmente
 
