@@ -123,7 +123,7 @@ type WordPressTestimonio = {
     curso?: string;
     texto?: string;
     iniciales?: string;
-    nombre_completo?: string; // ✅ NUEVO CAMPO AÑADIDO
+    nombre_completo?: string;
   };
 };
 
@@ -252,7 +252,6 @@ function Index() {
       .filter(Boolean);
   };
 
-  // ✅ CORREGIDO: optional chaining en toLowerCase para evitar errores si el valor es null/undefined
   const normalizeCategoria = (value?: string): Curso["categoria"] =>
     value?.toLowerCase()?.includes("educ") ? "Educación" : "Salud";
 
@@ -391,7 +390,7 @@ function Index() {
     };
   }, []);
 
-  // ✅ Cargar testimonios desde WordPress con prioridad para "nombre_completo"
+  // Cargar testimonios desde WordPress
   useEffect(() => {
     if (!WP_API_BASE) return;
     let cancelled = false;
@@ -404,13 +403,10 @@ function Index() {
       .then((data) => {
         if (!cancelled && Array.isArray(data) && data.length > 0) {
           const mapped = (data as WordPressTestimonio[]).map((testimonio) => {
-            // Intentar obtener el nombre desde el campo ACF "nombre_completo"
             const nombreDesdeACF = testimonio.acf?.nombre_completo || "";
-            // Si existe, lo usamos; si no, usamos el título del post como fallback
             const nombre = nombreDesdeACF
               ? decodeHtmlEntities(stripHtml(nombreDesdeACF))
               : decodeHtmlEntities(stripHtml(testimonio.title?.rendered || "Alumno/a"));
-            
             return {
               id: testimonio.id,
               nombre,
@@ -433,7 +429,6 @@ function Index() {
         if (!cancelled) {
           console.error(err);
           setTestimoniosError(err instanceof Error ? err.message : "Error al cargar testimonios.");
-          // Se conserva testimoniosLocales, ya cargado como estado inicial.
         }
       });
 
@@ -458,9 +453,6 @@ function Index() {
     });
   };
 
-  // ============================================================
-  // Formulario de inscripción con FormData
-  // ============================================================
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setEnviando(true);
@@ -482,10 +474,8 @@ function Index() {
       formData.append("your-course", selectedCourse);
       formData.append("your-message", mensaje);
 
-      // Campos obligatorios para que CF7 valide la petición
       formData.append("_wpcf7", CF7_FORM_ID);
       formData.append("_wpcf7_unit_tag", `wpcf7-f${CF7_FORM_ID}-o1`);
-      // ✅ Eliminamos "_wpcf7_version" para evitar conflictos con futuras actualizaciones
 
       const response = await fetch(
         `${WP_API_BASE.replace(/\/$/, "")}/wp-json/contact-form-7/v1/contact-forms/${CF7_FORM_ID}/feedback`,
@@ -764,19 +754,14 @@ function Index() {
         </div>
       </section>
 
-      {/* Áreas */}
+      {/* ✅ ÁREAS ACTUALIZADAS: 2 columnas, CURSOS EN SALUD + Prácticas profesionales */}
       <section className="border-y border-border bg-background">
-        <div className="container-tight grid gap-6 py-14 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="container-tight grid gap-6 py-14 sm:grid-cols-2">
           {[
             {
               icon: Stethoscope,
-              titulo: "Área Salud",
-              texto: "Enfermería, primeros auxilios, RCP y gestión de servicios de salud.",
-            },
-            {
-              icon: GraduationCap,
-              titulo: "Área Educación",
-              texto: "Formación docente, pedagogía aplicada y diseño de programas educativos.",
+              titulo: "CURSOS EN SALUD",
+              texto: "Registro único de asistentes de salud privada Argentina (RUAPSA)",
             },
             {
               icon: Building2,
