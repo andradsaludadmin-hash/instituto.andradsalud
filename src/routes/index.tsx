@@ -42,7 +42,13 @@ import {
   CarouselPrevious,
   CarouselNext,
 } from "@/components/ui/carousel";
-import { cursos as cursosLocales, institucion, pasos, type Curso } from "@/data/site-content";
+import {
+  cursos as cursosLocales,
+  institucion,
+  pasos,
+  testimonios as testimoniosLocales,
+  type Curso,
+} from "@/data/site-content";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -99,6 +105,25 @@ type WordPressTaller = {
   };
   _embedded?: {
     [key: string]: Array<{ source_url?: string }>;
+  };
+};
+
+type Testimonio = {
+  id: number;
+  nombre: string;
+  curso: string;
+  texto: string;
+  iniciales: string;
+};
+
+type WordPressTestimonio = {
+  id: number;
+  title?: { rendered?: string };
+  acf?: {
+    curso?: string;
+    texto?: string;
+    iniciales?: string;
+    nombre_completo?: string; // ✅ NUEVO CAMPO AÑADIDO
   };
 };
 
@@ -191,6 +216,9 @@ function Index() {
   const [talleres, setTalleres] = useState<Taller[]>([]);
   const [talleresLoading, setTalleresLoading] = useState(false);
   const [talleresError, setTalleresError] = useState<string | null>(null);
+
+  const [testimoniosState, setTestimoniosState] = useState<Testimonio[]>(testimoniosLocales);
+  const [testimoniosError, setTestimoniosError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -224,8 +252,9 @@ function Index() {
       .filter(Boolean);
   };
 
+  // ✅ CORREGIDO: optional chaining en toLowerCase para evitar errores si el valor es null/undefined
   const normalizeCategoria = (value?: string): Curso["categoria"] =>
-    value?.toLowerCase().includes("educ") ? "Educación" : "Salud";
+    value?.toLowerCase()?.includes("educ") ? "Educación" : "Salud";
 
   useEffect(() => {
     document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
@@ -362,6 +391,57 @@ function Index() {
     };
   }, []);
 
+  // ✅ Cargar testimonios desde WordPress con prioridad para "nombre_completo"
+  useEffect(() => {
+    if (!WP_API_BASE) return;
+    let cancelled = false;
+
+    fetch(`${WP_API_BASE.replace(/\/$/, "")}/wp-json/wp/v2/testimonio`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Error al obtener testimonios.");
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled && Array.isArray(data) && data.length > 0) {
+          const mapped = (data as WordPressTestimonio[]).map((testimonio) => {
+            // Intentar obtener el nombre desde el campo ACF "nombre_completo"
+            const nombreDesdeACF = testimonio.acf?.nombre_completo || "";
+            // Si existe, lo usamos; si no, usamos el título del post como fallback
+            const nombre = nombreDesdeACF
+              ? decodeHtmlEntities(stripHtml(nombreDesdeACF))
+              : decodeHtmlEntities(stripHtml(testimonio.title?.rendered || "Alumno/a"));
+            
+            return {
+              id: testimonio.id,
+              nombre,
+              curso: testimonio.acf?.curso || "",
+              texto: testimonio.acf?.texto || "",
+              iniciales:
+                testimonio.acf?.iniciales ||
+                nombre
+                  .split(" ")
+                  .map((p) => p[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase(),
+            };
+          });
+          setTestimoniosState(mapped);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.error(err);
+          setTestimoniosError(err instanceof Error ? err.message : "Error al cargar testimonios.");
+          // Se conserva testimoniosLocales, ya cargado como estado inicial.
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const abrirDetalle = (curso: Curso) => {
     setCursoActivo(curso);
     setSheetOpen(true);
@@ -379,7 +459,7 @@ function Index() {
   };
 
   // ============================================================
-  // 🔥 CORRECCIÓN DEFINITIVA: FormData + campos obligatorios
+  // Formulario de inscripción con FormData
   // ============================================================
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -395,7 +475,6 @@ function Index() {
       cursos.find((curso) => String(curso.id) === cursoSeleccionado)?.titulo ?? "";
 
     try {
-      // Usar FormData (multipart/form-data) - el formato que CF7 espera
       const formData = new FormData();
       formData.append("your-name", nombre);
       formData.append("your-email", email);
@@ -406,13 +485,12 @@ function Index() {
       // Campos obligatorios para que CF7 valide la petición
       formData.append("_wpcf7", CF7_FORM_ID);
       formData.append("_wpcf7_unit_tag", `wpcf7-f${CF7_FORM_ID}-o1`);
-      formData.append("_wpcf7_version", "6.1.6"); // versión de tu CF7 (la que tienes instalada)
+      // ✅ Eliminamos "_wpcf7_version" para evitar conflictos con futuras actualizaciones
 
       const response = await fetch(
         `${WP_API_BASE.replace(/\/$/, "")}/wp-json/contact-form-7/v1/contact-forms/${CF7_FORM_ID}/feedback`,
         {
           method: "POST",
-          // NO incluir 'Content-Type' - el navegador lo establece con el boundary correcto
           body: formData,
         },
       );
@@ -420,7 +498,6 @@ function Index() {
       const data = await response.json();
 
       if (data.status === "mail_sent") {
-        // ✅ Usamos formRef en lugar de event.currentTarget
         formRef.current?.reset();
         setCursoSeleccionado("");
         setFormSuccess(
@@ -1045,7 +1122,7 @@ function Index() {
             />
           </Reveal>
           <Reveal delay={100}>
-            <Testimonials />
+            <Testimonials testimonios={testimoniosState} />
           </Reveal>
         </div>
       </section>
