@@ -41,6 +41,7 @@ import {
   CarouselItem,
   CarouselPrevious,
   CarouselNext,
+  type CarouselApi, // ✅ NUEVO
 } from "@/components/ui/carousel";
 import {
   cursos as cursosLocales,
@@ -127,20 +128,50 @@ type WordPressTestimonio = {
   };
 };
 
+// ✅ NUEVO: tipo para los slides del hero
+type HeroSlide = {
+  id: string | number;
+  src: string;
+  alt: string;
+  titulo?: string;
+  subtitulo?: string;
+  cta_texto?: string;
+  cta_link?: string;
+};
+
+type WordPressHeroSlide = {
+  id: number;
+  title?: { rendered?: string };
+  acf?: {
+    imagen_de_fondo?: string;
+    titulo?: string;
+    subtitulo?: string;
+    cta_texto?: string;
+    cta_link?: string;
+  };
+  _embedded?: {
+    [key: string]: Array<{ source_url?: string }>;
+  };
+};
+
 const filtros = ["Todos", "Salud", "Educación"] as const;
 const WP_API_BASE = String(import.meta.env["VITE_WP_API_BASE"] ?? "").trim();
 const CF7_FORM_ID = String(import.meta.env["VITE_CF7_FORM_ID"] ?? "").trim();
 
-const heroSlides = [
+// ✅ NUEVO: renombrado a "fallback" porque ahora WP tiene prioridad
+const heroSlidesFallback: HeroSlide[] = [
   {
+    id: "fb-1",
     src: carruselImg1,
     alt: "Grupo de estudiantes de salud en práctica profesional",
   },
   {
+    id: "fb-2",
     src: carruselImg2,
     alt: "Clase práctica con instructor en sala de salud",
   },
   {
+    id: "fb-3",
     src: carruselImg3,
     alt: "Aulas modernas con equipo de capacitación en salud",
   },
@@ -222,6 +253,12 @@ function Index() {
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
+
+  // ✅ NUEVO: estado del hero slider
+  const [heroSlidesState, setHeroSlidesState] = useState<HeroSlide[]>(heroSlidesFallback);
+  const [heroApi, setHeroApi] = useState<CarouselApi | null>(null);
+  const [heroCurrent, setHeroCurrent] = useState(0);
+  const [heroPaused, setHeroPaused] = useState(false);
 
   const sectionIds = useMemo(() => navLinks.map((l) => l.id), []);
   const active = useActiveSection(sectionIds);
@@ -431,6 +468,59 @@ function Index() {
           setTestimoniosError(err instanceof Error ? err.message : "Error al cargar testimonios.");
         }
       });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ✅ NUEVO: autoplay + sincronización de dots con el carousel
+  useEffect(() => {
+    if (!heroApi || heroPaused) return;
+
+    const onSelect = () => setHeroCurrent(heroApi.selectedScrollSnap());
+    heroApi.on("select", onSelect);
+    onSelect();
+
+    const id = setInterval(() => {
+      if (!heroApi.canScrollNext()) heroApi.scrollTo(0);
+      else heroApi.scrollNext();
+    }, 5500);
+
+    return () => {
+      clearInterval(id);
+      heroApi.off("select", onSelect);
+    };
+  }, [heroApi, heroPaused]);
+
+  // ✅ NUEVO: fetch de hero-slide desde WordPress
+  useEffect(() => {
+    if (!WP_API_BASE) return;
+    let cancelled = false;
+
+    fetch(
+      `${WP_API_BASE.replace(/\/$/, "")}/wp-json/wp/v2/hero-slide?_embed&per_page=10&orderby=menu_order&order=asc`,
+    )
+      .then((res) =>
+        res.ok ? res.json() : Promise.reject(new Error("Error al obtener hero slides")),
+      )
+      .then((data) => {
+        if (cancelled || !Array.isArray(data) || data.length === 0) return;
+        const mapped: HeroSlide[] = (data as WordPressHeroSlide[]).map((slide) => ({
+          id: slide.id,
+          src:
+            slide.acf?.imagen_de_fondo ||
+            slide._embedded?.["wp:featuredmedia"]?.[0]?.source_url ||
+            carruselImg1,
+          alt: slide.acf?.titulo || slide.title?.rendered || "Slide",
+          titulo: slide.acf?.titulo,
+          subtitulo: slide.acf?.subtitulo,
+          cta_texto: slide.acf?.cta_texto,
+          cta_link: slide.acf?.cta_link,
+        }));
+        setHeroSlidesState(mapped);
+      })
+      .catch((err) => console.error("[hero-slide] fetch error:", err));
 
     return () => {
       cancelled = true;
@@ -706,27 +796,56 @@ function Index() {
 
           <Reveal delay={150} className="relative mx-auto w-full max-w-xl lg:max-w-none">
             <div className="relative overflow-visible rounded-3xl shadow-2xl shadow-primary/15">
-              <Carousel opts={{ loop: true, align: "center", containScroll: "trimSnaps" }}>
-                <CarouselContent className="flex gap-4 px-4 py-4">
-                  {heroSlides.map((slide) => (
-                    <CarouselItem
-                      key={slide.alt}
-                      className="min-w-[85%] shrink-0 overflow-hidden rounded-3xl"
-                    >
-                      <img
-                        src={slide.src}
-                        alt={slide.alt}
-                        width={1200}
-                        height={912}
-                        className="h-full w-full object-cover"
+              {/* ✅ NUEVO: carousel con autoplay + dots + setApi */}
+              <div
+                onMouseEnter={() => setHeroPaused(true)}
+                onMouseLeave={() => setHeroPaused(false)}
+              >
+                <Carousel
+                  opts={{ loop: true, align: "center", containScroll: "trimSnaps" }}
+                  setApi={setHeroApi}
+                >
+                  <CarouselContent className="flex gap-4 px-4 py-4">
+                    {heroSlidesState.map((slide) => (
+                      <CarouselItem
+                        key={slide.id}
+                        className="min-w-[85%] shrink-0 overflow-hidden rounded-3xl"
+                      >
+                        <img
+                          src={slide.src}
+                          alt={slide.alt}
+                          width={1200}
+                          height={912}
+                          className="h-full w-full object-cover"
+                        />
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  <CarouselPrevious className="left-4 right-auto z-20 bg-white/95 border border-border text-slate-900 shadow-lg shadow-slate-900/10" />
+                  <CarouselNext className="right-4 left-auto z-20 bg-white/95 border border-border text-slate-900 shadow-lg shadow-slate-900/10" />
+                </Carousel>
+
+                {/* ✅ NUEVO: dots indicadores */}
+                {heroSlidesState.length > 1 && (
+                  <div className="mt-5 flex justify-center gap-2">
+                    {heroSlidesState.map((slide, i) => (
+                      <button
+                        key={slide.id}
+                        type="button"
+                        onClick={() => heroApi?.scrollTo(i)}
+                        aria-label={`Ir al slide ${i + 1}`}
+                        aria-current={i === heroCurrent}
+                        className={cn(
+                          "h-2 rounded-full transition-all",
+                          i === heroCurrent ? "w-7 bg-primary" : "w-2 bg-border hover:bg-primary/40",
+                        )}
                       />
-                    </CarouselItem>
-                  ))}
-                </CarouselContent>
-                <CarouselPrevious className="left-4 right-auto z-20 bg-white/95 border border-border text-slate-900 shadow-lg shadow-slate-900/10" />
-                <CarouselNext className="right-4 left-auto z-20 bg-white/95 border border-border text-slate-900 shadow-lg shadow-slate-900/10" />
-              </Carousel>
-              <div className="absolute inset-0 bg-gradient-to-tr from-navy/45 via-transparent to-transparent" />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-navy/45 via-transparent to-transparent" />
             </div>
             <div className="absolute -bottom-6 -left-4 hidden rounded-2xl border border-border bg-background/95 p-4 shadow-xl backdrop-blur sm:block">
               <div className="flex items-center gap-3">
@@ -1446,8 +1565,7 @@ function Index() {
             </div>
           </div>
           <div className="mt-12 border-t border-primary-foreground/10 pt-8 text-center text-xs text-primary-foreground/50">
-            © {new Date().getFullYear()} Instituto Andrad Salud. Todos los
-derechos reservados.
+            © {new Date().getFullYear()} Instituto Andrad Salud. Todos los derechos reservados.
           </div>
         </div>
       </footer>
