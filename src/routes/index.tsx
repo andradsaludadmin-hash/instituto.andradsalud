@@ -278,7 +278,7 @@ function Index() {
 
       try {
         const response = await fetch(
-          `${WP_API_BASE.replace(/\/$/, "")}/wp-json/wp/v2/curso?_embed`,
+          `${WP_API_BASE.replace(/\/$/, "")}/wp-json/wp/v2/curso?_embed&per_page=100`,
         );
         if (!response.ok) throw new Error("Error al obtener cursos desde WordPress.");
 
@@ -359,7 +359,7 @@ function Index() {
     let cancelled = false;
     setTalleresLoading(true);
 
-    fetch(`${WP_API_BASE.replace(/\/$/, "")}/wp-json/wp/v2/taller?_embed`)
+    fetch(`${WP_API_BASE.replace(/\/$/, "")}/wp-json/wp/v2/taller?_embed&per_page=100`)
       .then((res) => {
         if (!res.ok) throw new Error("Error al obtener talleres.");
         return res.json();
@@ -395,7 +395,7 @@ function Index() {
     if (!WP_API_BASE) return;
     let cancelled = false;
 
-    fetch(`${WP_API_BASE.replace(/\/$/, "")}/wp-json/wp/v2/testimonio`)
+    fetch(`${WP_API_BASE.replace(/\/$/, "")}/wp-json/wp/v2/testimonio?_embed&per_page=100`)
       .then((res) => {
         if (!res.ok) throw new Error("Error al obtener testimonios.");
         return res.json();
@@ -1446,8 +1446,8 @@ function Index() {
             </div>
           </div>
           <div className="mt-12 border-t border-primary-foreground/10 pt-8 text-center text-xs text-primary-foreground/50">
-            © {new Date().getFullYear()} Instituto Andrad Salud. Prototipo visual. Todos los
-            derechos reservados.
+            © {new Date().getFullYear()} Instituto Andrad Salud. Todos los
+derechos reservados.
           </div>
         </div>
       </footer>
