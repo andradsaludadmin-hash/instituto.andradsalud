@@ -1046,7 +1046,7 @@ function Index() {
                   <button
                     type="button"
                     onClick={() => abrirDetalle(curso)}
-                    className="relative aspect-[4/3] overflow-hidden text-left"
+                    className="relative aspect-[4/5] overflow-hidden text-left"
                     aria-label={`Ver detalle de ${curso.titulo}`}
                   >
                     <img
