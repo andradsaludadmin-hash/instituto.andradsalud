@@ -106,14 +106,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "Cursos presenciales de capacitación en áreas de educación y salud. Certificación profesional, docentes especializados y prácticas en instituciones de referencia.",
       },
-      // ✅ IMAGEN OG ACTUALIZADA: usa el archivo local en /public
+      // ✅ IMAGEN OG con URL absoluta para que funcione al compartir en WhatsApp/Facebook/Twitter
       {
         property: "og:image",
-        content: "/og-image.jpg",
+        content: `${SITE_URL}/og-image.jpg`,
       },
       {
         name: "twitter:image",
-        content: "/og-image.jpg",
+        content: `${SITE_URL}/og-image.jpg`,
       },
     ],
     links: [
